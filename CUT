@@ -1,0 +1,90 @@
+#!/usr/bin/perl -w
+use PDL;
+
+$filename = $ARGV[0];
+$start = 1;
+$end = 99999;
+$suffix = "";
+if ($#ARGV > 0) {
+	$start = $ARGV[1];
+}
+if ($#ARGV > 1) {
+	$end = $ARGV[2];
+	if ($start < 0) {
+		$start = (-$start - 1) * $end + 1;
+		$end = $start + $end - 1;
+	}
+}
+if ($#ARGV == 3) { $suffix = $ARGV[3];}
+open($in, "<$filename");
+$filename =~ s/\.log$/$suffix/;
+open($out, ">$filename");
+@lines = <$in>;
+for $i (0 .. $#lines) {
+	if ($lines[$i] =~ / Standard orientation/) {
+		@listA = ();
+		for $atom ($start .. $end) {
+			if ($lines[$i+4+$atom] =~ /------------/) {
+				$end = $atom - 1;
+				last;
+			}
+			@values = split(' ',$lines[$i+4+$atom]);
+			@listA = (@listA,@values[-3..-1]);
+		}
+	}
+	if ($lines[$i] =~ / normal coordinates/) {
+		$s = $i;
+		last;
+	}
+}
+
+@listF = ();  # frequencies
+@listM = ();  # atomic Masses
+@listR = ();  # reduced masses
+for $i ($s .. $#lines) {
+	if ($lines[$i] =~ / Frequencies -- /) {
+		$i++;
+		@values = split(' ',$lines[$i]);
+		@listR = (@listR,@values[-3 .. -1]);
+		$i = $i + 3 + $start;
+		for $atom ($start ..$end) {
+			@values = split(' ',$lines[$i]);
+			@listF = (@listF,@values[2 .. $#values]);
+			$i++;
+		}
+	}
+	if ($lines[$i] =~ /Temperature/) {
+		for $atom ($start .. $end) {
+			@values = split(' ',$lines[$i+$atom]);
+			@listM = (@listM,$values[-1]);
+		}
+		last;
+
+	}
+}
+
+for $i (0 .. $#listA/3) {
+	printf $out "%9f %10f %10f %10f\n", $listM[$i], $listA[3*$i], $listA[3*$i+1], $listA[3*$i+2]; 
+}
+
+$atoms = $end - $start;  # number of atoms - 1, index of the last atom
+$r = 0;
+for ($i = 0; $i < $#listF+1; $i+=9*($atoms+1)) {
+	print $out "$listR[$r]\n";
+	for $j (0 .. $atoms) {
+		printf $out "%6.2f %6.2f %6.2f\n", $listF[$i+$j*9], $listF[$i+1+$j*9], $listF[$i+2+$j*9]; 
+	}
+	print $out "$listR[$r+1]\n";
+	for $j (0 .. $atoms) {
+		printf $out "%6.2f %6.2f %6.2f\n", $listF[$i+3+$j*9], $listF[$i+4+$j*9], $listF[$i+5+$j*9]; 
+	}
+	print $out "$listR[$r+2]\n";
+	for $j (0 .. $atoms) {
+		printf $out "%6.2f %6.2f %6.2f\n", $listF[$i+6+$j*9], $listF[$i+7+$j*9], $listF[$i+8+$j*9]; 
+	}
+$r+=3;
+}
+
+close($out);
+close($in);
+

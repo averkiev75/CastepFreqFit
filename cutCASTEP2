@@ -1,0 +1,86 @@
+#!/usr/bin/perl -w
+use local::lib;
+use PDL;
+use PDL::Matrix;
+
+open(LOG, $ARGV[0]);
+@lines = <LOG>;
+close(LOG);
+$ions = 0;
+$branches = 0;
+$Cell = pdl([]);
+$Coord = pdl([]);
+$Shifts = pdl([]);
+$Shifts1 = pdl([]);
+@listM=();
+$Natoms = 48;
+
+for $i (0 .. $#lines)  {
+	if ($lines[$i] =~ /Number of ions\s+(\d+)/) {
+		$ions = $1;
+	}
+	if ($lines[$i] =~ /Number of branches\s+(\d+)/) {
+		$branches = $1;
+	}
+	if ($lines[$i] =~ / Unit cell vectors /) {
+		@matrix = split(' ',$lines[$i+1]);
+		$Cell = $Cell->glue(1,pdl([@matrix]));
+		@matrix = split(' ',$lines[$i+2]);
+		$Cell = $Cell->glue(1,pdl([@matrix]));
+		@matrix = split(' ',$lines[$i+3]);
+		$Cell = $Cell->glue(1,pdl([@matrix]));
+	}
+	if ($lines[$i] =~ /Fractional Co-ordinates/) {
+		for $k (1 .. $ions) {
+			@matrix = split(' ',$lines[$i+$k]);
+# @listM = (@listM,$xx$values[-1]);
+			@matrix = @matrix[1..3,5];
+			$Coord = $Coord->glue(1,pdl([@matrix]));
+		}
+print		$molecule = $Coord->dice([0,1,2],[0 .. $Natoms-1]);
+print		$listM = $Coord->dice([3],[0 .. $Natoms-1]);
+		$molecule =  $molecule x $Cell;
+
+	}
+	if ($lines[$i] =~ /Mode Ion   /) {
+		for $k (1 .. $branches) {
+			$Shifts1 = pdl([]);
+			for $l (1 .. $ions) {
+				@matrix = split(' ',$lines[$i+($k-1)*$ions+$l]);
+				@matrix = @matrix[2,4,6];
+				$Shifts1 = $Shifts1->glue(1,pdl([@matrix]));
+			}
+			$Shifts = $Shifts->glue(2,$Shifts1)
+		}
+	}
+}
+
+$out = $ARGV[0];
+$out =~ s/_Efield.*//;
+if ($#ARGV > 0) {
+	$out = $out.$ARGV[1];
+}
+
+open(COORD, ">$out");
+@molecule = list $molecule;
+@listM = list $listM;
+
+for ($i = 0; $i < $#molecule+1; $i+=3) {
+	printf COORD "%7.3f  %8.4f %8.4f %8.4f\n", $listM[$i/3], $molecule[$i], $molecule[$i+1], $molecule[$i+2];
+}
+
+
+@Shifts = list $Shifts;
+for $k (1 .. $branches) {
+	$reduce = 0;
+	for ($i = 0; $i < $#molecule+1; $i+=3) {
+		$counter =  $i+($k-1)*($#molecule+1);
+		$reduce = $reduce + $Shifts[$counter]*$Shifts[$counter] + $Shifts[$counter+1]*$Shifts[$counter+1] + $Shifts[$counter+2]*$Shifts[$counter+2];
+	}
+	printf COORD "%8.4f\n", $reduce;
+	for ($i = 0; $i < $#molecule+1; $i+=3) {
+		$counter =  $i+($k-1)*($#molecule+1);
+		printf COORD "%8.3f %8.3f %8.3f\n", $Shifts[$counter], $Shifts[$counter+1], $Shifts[$counter+2];
+	}
+}
+close(COORD);

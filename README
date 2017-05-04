@@ -1,0 +1,7 @@
+cutSTEP takes only mol atoms
+cutCASTEP1 takes only mol atoms and normilize - don't use it
+cutCASTEP2 takes all atoms - use it now
+
+fit - normilize
+fit1 - don't normilie - use it now
+fit2 - don't use it

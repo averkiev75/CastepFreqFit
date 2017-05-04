@@ -1,0 +1,95 @@
+#!/usr/bin/perl -w
+
+$filename1 = $ARGV[0];
+$filename2 = $ARGV[1];
+open($file1, "<$filename1");
+open($file2, "<$filename2");
+open($out, ">output");
+$atoms = 0;
+@mass = ();
+@reduce = ();
+@lines = <$file1>;
+for $i (0 .. $#lines) {
+	@values = split(' ',$lines[$i]);
+	if ($#values == 3) {
+		@mass = (@mass,$values[0]);
+	}
+	else {
+		$atoms = $i;  
+		last;
+	}
+}
+
+@allS = ();
+@lines = @lines[$atoms .. $#lines];
+$freqsS = ($#lines+1)/($atoms+1);
+for $i (0 .. $freqsS-1) {
+	@freq = ();
+	$reduce = $lines[$i*($atoms+1)];
+	for $j (0 .. $atoms - 1) {
+		@values = split(' ',$lines[$i*($atoms+1)+$j+1]);
+		for $s (0 .. 2) {
+			$values[$s]*=(sqrt($mass[$j]/$reduce)); 
+		}
+
+		@freq = (@freq,@values);
+	}
+	push(@{$allS[$i]},@freq);
+}
+
+#print "@{$all[0]}";
+
+@lines = <$file2>;
+for $i (0 .. $#lines) {
+	@values = split(' ',$lines[$i]);
+	if ($#values == 3) {
+		@mass = (@mass,$values[0]);
+	}
+	else {
+		$atoms = $i;  
+		last;
+	}
+}
+@allE = ();
+@lines = @lines[$atoms .. $#lines];
+$freqsE = ($#lines+1)/($atoms+1);
+for $i (0 .. $freqsE-1) {
+	@freq = ();
+	$reduce = $lines[$i*($atoms+1)];
+	for $j (0 .. $atoms - 1) {
+		@values = split(' ',$lines[$i*($atoms+1)+$j+1]);
+		for $s (0 .. 2) {
+			$values[$s]*=(sqrt($mass[$j]/$reduce)); 
+		}
+		@freq = (@freq,@values);
+	}
+	push(@{$allE[$i]},@freq);
+}
+
+
+for $i (0 .. $#allE) {
+	for $j (0 .. $#allS) {
+		$sc = &scalar($allE[$i],$allS[$j]);
+		if ($sc*$sc > 0.11)  {
+			printf "%d  %d  %.2f\n", $i+1, $j+1, $sc;
+		}
+	}
+		print "\n";
+}
+
+
+close ($out);
+close ($file1);
+close ($file2);
+
+sub scalar {
+	$summ = 0;
+	@a = @{$_[0]};
+	@b = @{$_[1]};
+	for $s (0 .. 3*$atoms-1) {
+		$summ = $summ + $a[$s]*$b[$s];
+	}
+	$summ;
+}
+
+
